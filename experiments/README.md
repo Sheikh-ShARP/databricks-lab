@@ -6,9 +6,9 @@ on Databricks using Unity Catalog across DEV, TEST, and PROD environments.
 
 ## Environments
 We use a single codebase with runtime environment selection:
-- dev  → dev_supply_chain
-- test → test_supply_chain
-- prod → prod_supply_chain
+- dev  → supply_dev
+- test → supply_test
+- prod → supply_prod
 
 The environment is injected via Databricks widget parameter `env`.
 
@@ -29,8 +29,8 @@ Notebooks must be executed in the following order:
 
 ## Data Sources
 Raw files must exist in:
-/Volumes/<env>_supply_chain/bronze/raw_data/
+/Volumes/<env>_supply/bronze/raw_data/
 
 ## Outputs
 Tables are written to:
-<env>_supply_chain.<bronze|silver|gold>
+<env>_supply.<bronze|silver|gold>

@@ -1,0 +1,450 @@
+{
+  "datasets": [
+    {
+      "name": "44a5861b",
+      "displayName": "Company Profit and Loss Overview",
+      "queryLines": [
+        "SELECT\r\n",
+        "  total_revenue,\r\n",
+        "  total_cost,\r\n",
+        "  profit,\r\n",
+        "  profit_margin\r\n",
+        "FROM supply_dev.gold.company_profit_kpi;"
+      ]
+    },
+    {
+      "name": "85c9fedb",
+      "displayName": "Product Performance Insights",
+      "queryLines": [
+        "SELECT\r\n",
+        "  product_type,\r\n",
+        "  profit\r\n",
+        "FROM supply_dev.gold.product_profit_kpi;\r\n"
+      ]
+    },
+    {
+      "name": "6a0983a7",
+      "displayName": "Product Efficiency Overview",
+      "queryLines": [
+        "SELECT \r\n",
+        "     product_type,\r\n",
+        "     inventory_efficiency\r\n",
+        "FROM supply_dev.gold.inventory_efficient_kpi;"
+      ]
+    },
+    {
+      "name": "c2740149",
+      "displayName": "Shipping Cost Analysis Insights",
+      "queryLines": [
+        "SELECT \r\n",
+        "  product_type, \r\n",
+        "  shipping_cost_ratio\r\n",
+        "FROM supply_dev.gold.product_shipping_cost_kpi;"
+      ]
+    },
+    {
+      "name": "aa236e6b",
+      "displayName": "Delivery Performance Insights for Products",
+      "queryLines": [
+        "SELECT\r\n",
+        "  product_type, \r\n",
+        "  on_time_delivery_rate\r\n",
+        "FROM supply_dev.gold.product_on_time_delivery_kpi"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "905a60ba",
+      "displayName": "Executive Overview",
+      "layout": [
+        {
+          "widget": {
+            "name": "are-we-making-a-profit",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "44a5861b",
+                  "fields": [
+                    {
+                      "name": "sum(profit_margin)",
+                      "expression": "SUM(`profit_margin`)"
+                    },
+                    {
+                      "name": "sum(profit)",
+                      "expression": "SUM(`profit`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(profit)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "USD",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "style": {
+                    "rules": [
+                      {
+                        "condition": {
+                          "operator": ">="
+                        }
+                      }
+                    ]
+                  }
+                },
+                "target": {
+                  "fieldName": "sum(profit_margin)",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "showDescription": true,
+                "description": "Company-wide profit and margin",
+                "title": "Total Profit\n"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "most-profitable-products",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "85c9fedb",
+                  "fields": [
+                    {
+                      "name": "product_type",
+                      "expression": "`product_type`"
+                    },
+                    {
+                      "name": "sum(profit)",
+                      "expression": "SUM(`profit`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "product_type",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(profit)",
+                  "format": {
+                    "type": "number-currency",
+                    "currencyCode": "USD",
+                    "abbreviation": "compact",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Most Profitable Products\n"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 6,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "inventory-efficiency-risk-high-worse",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6a0983a7",
+                  "fields": [
+                    {
+                      "name": "product_type",
+                      "expression": "`product_type`"
+                    },
+                    {
+                      "name": "inventory_efficiency",
+                      "expression": "`inventory_efficiency`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "product_type",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "inventory_efficiency",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Inventory Efficiency Risk (High = Worse)\n"
+              },
+              "mark": {
+                "colors": [
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 2
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 3
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 4
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 5
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 6
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 7
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 8
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 9
+                  },
+                  {
+                    "themeColorType": "visualizationColors",
+                    "position": 10
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 12,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "shipping-cost-impact-higher-worse",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "c2740149",
+                  "fields": [
+                    {
+                      "name": "product_type",
+                      "expression": "`product_type`"
+                    },
+                    {
+                      "name": "shipping_cost_ratio",
+                      "expression": "`shipping_cost_ratio`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "product_type",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "shipping_cost_ratio",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 3
+                    }
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Shipping Cost Impact (Higher = Worse)\n"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 18,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "on-time-delivery-rate-lower-worse",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "aa236e6b",
+                  "fields": [
+                    {
+                      "name": "product_type",
+                      "expression": "`product_type`"
+                    },
+                    {
+                      "name": "on_time_delivery_rate",
+                      "expression": "`on_time_delivery_rate`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "product_type",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "y-reversed"
+                    }
+                  }
+                },
+                "y": {
+                  "fieldName": "on_time_delivery_rate",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "max",
+                      "places": 2
+                    }
+                  },
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "label": {
+                  "show": true
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "On-Time Delivery Rate (Lower = Worse)\n"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 26,
+            "width": 3,
+            "height": 6
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}

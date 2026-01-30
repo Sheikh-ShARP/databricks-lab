@@ -1,0 +1,14 @@
+SKU:
+  rules:
+    - type: required
+    - type: no_spaces
+
+Transportation_modes:
+  rules:
+    - type: allowed_values
+      values: ["Road", "Air", "Sea", "Rail"]
+
+Inspection_results:
+  rules:
+    - type: allowed_values
+      values: ["Pass", "Fail", "Rework"]

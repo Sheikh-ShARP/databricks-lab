@@ -95,4 +95,17 @@ def split_ingestion_metadata(df, metadata_cols: str):
     
     return clean_df, metadata_df
 
+def apply_structural_cleaning(df, config: dict):
+    """
+    Apply structural cleaning steps to a dataframe based on the provided configuration.
+    """
+    df = enforce_schema(df, config["schema"])
+    df = drop_nulls(df, config["required_columns"])
+    df = deduplicate_latest(df, config["key_columns"], config["timestamp_column"])
+    df = standardize_strings(df, config["upper_columns"], config["lower_columns"], config["trim_columns"])
+    df = filter_numeric_ranges(df, config["range_rules"])
+    df = normalize_timestamps(df, config["timestamp_columns"])
+    df = normalize_booleans(df, config["boolean_map"])
+    df, metadata_df = split_ingestion_metadata(df, config["metadata_columns"])
+    return df, metadata_df
     

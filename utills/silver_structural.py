@@ -1,44 +1,112 @@
-"""Silver cleaning functions"""
-from pyspark.sql.functions import col, sum, when, count, approx_count_distinct, min, max
+from pyspark.sql.functions import col, row_number, lit,  desc, col, lower, upper, trim, to_utc_timestamp
+from functools import reduce
+from pyspark.sql.window import Window
 
-def profile_null_rates(df):
-    """ Calculate percentage of null values in each column """
-    total_rows = df.count()
-    exprs = [
-        (sum(when(col(c).isNull(), 1).otherwise(0)) / total_rows).alias(f "{c}_null_pct")
-        for c in df.columns
-    ]
-    return df.agg(*exprs)
+def enforce_schema(df, schema_map: dict):
+    """
+    Enforce schema on a dataframe by casting columns to the specified data types.
 
-def profile_duplicate_ratio(df, key_cols: list):
-    """"Measures how many duplicate records exist for given keys"""
-    total_rows = df.count()
+    Schema_map = {
+        "column_name": "data_type",
+        ...}
+    """
+    for c , dtype in schema_map.items():
+        if c in df.columns:
+            df = df.withColumn(c, col(c).cast(dtype))
+    return df
 
-    dup_count = (
-        df.groupBy(*key_cols)
-        .count()
-        .filter("count > 1")
-        .count()
-    )   
-    return {"duplicatye_key_group" : dup_count, "total_rows" : total_rows}
+def drop_nulls(df, required_columns: list):
+    """
+    Drop rows with null values in the specified columns.
 
-def profile_cardinality(df, cols: list):
-    """Estimates distinct values per column"""
-    return df.agg(*[approx_count_distinct(c).alias(f"{c}_distinct_count") for c in cols if c in df.columns
-    ])
+    Required_columns = ["column_name", ...]
+    """
+    conditions = [col(c).isNotNull() for c in required_columns]
+    return df.where(reduce(lambda x, y: x & y, conditions))
 
-def profile_numeric_distribution(df, numeric_cols: list):
-    """Summary stats for numeric columns"""
+def deduplicate_latest(df, key_cols: list, timestamp_col: str):
+    """
+    Deduplicate rows based on the latest timestamp for each key.
 
-    return df.select(numeric_cols).describe()
+    Key_cols = ["column_name", ...]
+    """
+    window_spec = Window.partitionBy(*key_cols).orderBy(desc(timestamp_col))
+    return df.withColumn("row_num", row_number().over(window_spec)).filter(col("row_num") == 1).drop("row_num")
 
-def profile_timestamp_range(df, ts_cols: list):
-    """Find min and max timestamps"""
-    exprs = []
+def standardize_strings(df, upper_cols= None, lower_cols= None, trim_cols= None):
+    """
+    Standardize string columns by converting to upper or lower case and trimming whitespace.
+    """
+    lower_cols = lower_cols  or []
+    trim_cols = trim_cols or []
+    upper_cols = upper_cols or []
+
+    for c in lower_cols:
+        if c in df.columns:
+            df = df.withColumn(c, lower(col(c)))
+    for c in upper_cols:
+        if c in df.columns:
+            df = df.withColumn(c, upper(col(c)))
+    for c in trim_cols:
+        if c in df.columns:
+            df = df.withColumn(c, trim(col(c)))
+    return df
+
+def filter_numeric_ranges(df, range_rules: dict):
+    """
+    Filter rows based on numeric ranges.
+
+    Range_rules = {
+        "column_name": (min_value, max_value),
+        ...}
+    """
+    for c, (rule_min, rule_max) in range_rules.items():
+        if c in df.columns:
+            df = df.filter((col(c) >= rule_min) & (col(c) <= rule_max))
+    return df
+
+def normalize_timestamps(df, ts_cols: list, source_tz="UTC"):
     for c in ts_cols:
         if c in df.columns:
-            exprs.append(min(c).alias(f"{c}_min"))
-            exprs.append(max(c).alias(f"{c}_max"))
-    return df.agg(*exprs)
+            df = df.withCoumn(c, to_utc_timestamp(col(c), source_tz))
+    return df
+
+def normalize_booleans(df, bool_map: dict):
+    """"
+    Standardize boolean-like columns into True/False.
+    """
+    for col_name, mapping in bool_map.items():
+        if col_name in df.columns:
+            expr = None
+            for k, v in  mapping.items():
+                cond = When(col(col_name) == k, lit(v))
+                expr = cond if expr is None else expr.otherwise(cond)
+            df = df.withColumn(col_name, expr.otherwise(lit(None)))
+    return df
+
+def split_ingestion_metadata(df, metadata_cols: str):
+    """
+    Split ingestion metadata into separate columns.
+    """
+    existing = [c for c in metadata_cols if c in df.columns]
+
+    metadata_df = df.select(existing) if existing else None
+    clean_df = df.drop(*existing)
+    
+    return clean_df, metadata_df
+
+def apply_structural_cleaning(df, config: dict):
+    """
+    Apply structural cleaning steps to a dataframe based on the provided configuration.
+    """
+    df = enforce_schema(df, config["schema"])
+    df = drop_nulls(df, config["required_columns"])
+    df = deduplicate_latest(df, config["key_columns"], config["timestamp_column"])
+    df = standardize_strings(df, config["upper_columns"], config["lower_columns"], config["trim_columns"])
+    df = filter_numeric_ranges(df, config["range_rules"])
+    df = normalize_timestamps(df, config["timestamp_columns"])
+    df = normalize_booleans(df, config["boolean_map"])
+    df, metadata_df = split_ingestion_metadata(df, config["metadata_columns"])
+    return df, metadata_df
 
 

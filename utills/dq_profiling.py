@@ -1,111 +1,70 @@
-from pyspark.sql.functions import col, row_number, lit,  desc, col, lower, upper, trim, to_utc_timestamp
-from functools import reduce
-from pyspark.sql.window import Window
+"""Silver cleaning functions"""
+from pyspark.sql.functions import col, sum, when, count, approx_count_distinct, min, max
 
-def enforce_schema(df, schema_map: dict):
-    """
-    Enforce schema on a dataframe by casting columns to the specified data types.
+def profile_null_rates(df):
+    """ Calculate percentage of null values in each column """
+    total_rows = df.count()
+    exprs = [
+        (sum(when(col(c).isNull(), 1).otherwise(0)) / total_rows).alias(f"{c}_null_pct")
+        for c in df.columns
+    ]
+    return df.agg(*exprs)
 
-    Schema_map = {
-        "column_name": "data_type",
-        ...}
-    """
-    for c , dtype in schema_map.items():
-        if c in df.columns:
-            df = df.withColumn(c, col(c).cast(dtype))
-    return df
+def profile_duplicate_ratio(df, key_cols: list):
+    """Measures duplicate key groups and duplicate row count"""
+    total_rows = df.count()
 
-def drop_nulls(df, required_columns: list):
-    """
-    Drop rows with null values in the specified columns.
+    dup_df = df.groupBy(*key_cols).count().filter("count > 1")
 
-    Required_columns = ["column_name", ...]
-    """
-    conditions = [col(c).isNotNull() for c in required_columns]
-    return df.where(reduce(lambda x, y: x & y, conditions))
+    duplicate_groups = dup_df.count()
+    duplicate_rows = dup_df.selectExpr("sum(count) - count(*) as dup_rows").collect()[0]["dup_rows"]
 
-def deduplicate_latest(df, key_cols: list, timestamp_col: str):
-    """
-    Deduplicate rows based on the latest timestamp for each key.
+    return {
+        "duplicate_key_groups": duplicate_groups,
+        "duplicate_rows": duplicate_rows,
+        "total_rows": total_rows
+    }
 
-    Key_cols = ["column_name", ...]
-    """
-    window_spec = Window.partitionBy(*key_cols).orderBy(desc(timestamp_col))
-    return df.withColumn("row_num", row_number().over(window_spec)).filter(col("row_num") == 1).drop("row_num")
+def profile_cardinality(df, cols: list):
+    """Estimates distinct values per column"""
+    return df.agg(*[approx_count_distinct(c).alias(f"{c}_distinct_count") for c in cols if c in df.columns
+    ])
 
-def standardize_strings(df, upper_cols= None, lower_cols= None, trim_cols= None):
-    """
-    Standardize string columns by converting to upper or lower case and trimming whitespace.
-    """
-    lower_cols = lower_cols  or []
-    trim_cols = trim_cols or []
-    upper_cols = upper_cols or []
+def profile_numeric_distribution(df, numeric_cols: list):
+    """Summary stats for numeric columns"""
 
-    for c in lower_cols:
-        if c in df.columns:
-            df = df.withColumn(c, lower(col(c)))
-    for c in upper_cols:
-        if c in df.columns:
-            df = df.withColumn(c, upper(col(c)))
-    for c in trim_cols:
-        if c in df.columns:
-            df = df.withColumn(c, trim(col(c)))
-    return df
+    return df.select(numeric_cols).describe()
 
-def filter_numeric_ranges(df, range_rules: dict):
-    """
-    Filter rows based on numeric ranges.
-
-    Range_rules = {
-        "column_name": (min_value, max_value),
-        ...}
-    """
-    for c, (rule_min, rule_max) in range_rules.items():
-        if c in df.columns:
-            df = df.filter((col(c) >= rule_min) & (col(c) <= rule_max))
-    return df
-
-def normalize_timestamps(df, ts_cols: list, source_tz="UTC"):
+def profile_timestamp_range(df, ts_cols: list):
+    """Find min and max timestamps"""
+    exprs = []
     for c in ts_cols:
         if c in df.columns:
-            df = df.withCoumn(c, to_utc_timestamp(col(c), source_tz))
-    return df
+            exprs.append(min(c).alias(f"{c}_min"))
+            exprs.append(max(c).alias(f"{c}_max"))
+    return df.agg(*exprs)
 
-def normalize_booleans(df, bool_map: dict):
-    """"
-    Standardize boolean-like columns into True/False.
+def run_all_profiling_checks(df, config: dict):
     """
-    for col_name, mapping in bool_map.items():
-        if col_name in df.columns:
-            expr = None
-            for k, v in  mapping.items():
-                cond = When(col(col_name) == k, lit(v))
-                expr = cond if expr is None else expr.otherwise(cond)
-            df = df.withColumn(col_name, expr.otherwise(lit(None)))
-    return df
+    Runs all profiling checks based on config and returns a dictionary of metrics.
+    """
+    report = {}
 
-def split_ingestion_metadata(df, metadata_cols: str):
-    """
-    Split ingestion metadata into separate columns.
-    """
-    existing = [c for c in metadata_cols if c in df.columns]
+    report["null_rates"] = profile_null_rates(df)
 
-    metadata_df = df.select(existing) if existing else None
-    clean_df = df.drop(*existing)
-    
-    return clean_df, metadata_df
+    if "duplicate_keys" in config:
+        report["duplicates"] = profile_duplicate_ratio(df, config["duplicate_keys"])
 
-def apply_structural_cleaning(df, config: dict):
-    """
-    Apply structural cleaning steps to a dataframe based on the provided configuration.
-    """
-    df = enforce_schema(df, config["schema"])
-    df = drop_nulls(df, config["required_columns"])
-    df = deduplicate_latest(df, config["key_columns"], config["timestamp_column"])
-    df = standardize_strings(df, config["upper_columns"], config["lower_columns"], config["trim_columns"])
-    df = filter_numeric_ranges(df, config["range_rules"])
-    df = normalize_timestamps(df, config["timestamp_columns"])
-    df = normalize_booleans(df, config["boolean_map"])
-    df, metadata_df = split_ingestion_metadata(df, config["metadata_columns"])
-    return df, metadata_df
+    if "cardinality_cols" in config:
+        report["cardinality"] = profile_cardinality(df, config["cardinality_cols"])
+
+    if "numeric_cols" in config:
+        report["numeric_distribution"] = profile_numeric_distribution(df, config["numeric_cols"])
+
+    if "timestamp_cols" in config:
+        report["timestamp_range"] = profile_timestamp_range(df, config["timestamp_cols"])
+
+    return report
+
+
     

@@ -1,0 +1,16 @@
+schema:
+  Product_type: string
+  SKU: string
+  price: float
+
+ 
+
+required_columns:
+  - SKU
+  - price
+
+
+dedup_exclude_columns:
+  - _injets_ts
+  - env
+  - _source_file

@@ -1,0 +1,23 @@
+duplicate_keys:
+  - SKU
+  - Product_type
+
+#cardinality_cols:
+ # - country
+ # - is_active
+
+numeric_cols:
+  - Manufacturing_costs
+
+timestamp_cols:
+ - _ingest_ts
+
+
+null_rate_cols:
+  - Product_type
+  - SKU
+  - Price
+ 
+
+  # string_length_checks:
+  # email: [5, 100]

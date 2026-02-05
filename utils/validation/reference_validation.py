@@ -1,0 +1,1 @@
+""" cross-table rules"""

@@ -1,0 +1,16 @@
+field_rules:
+  string_rules:
+    SKU:
+      rules:
+        - type: required
+        - type: no_spaces
+        - type: regex
+          pattern: "^SKU[0-9]+$"
+
+
+    Product_Type:
+      rules:
+        - type: allowed_values
+          values: ["SKINCARE", "HAIRCARE", "COSMETICS"]
+
+  

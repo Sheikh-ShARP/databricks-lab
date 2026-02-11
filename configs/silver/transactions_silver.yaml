@@ -11,6 +11,9 @@ required_columns:
 
 
 dedup_exclude_columns:
-  - _injets_ts
+  - _ingest_ts
   - env
   - _source_file
+
+range_rules:
+  price: [0, null]

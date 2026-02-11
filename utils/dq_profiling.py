@@ -5,30 +5,70 @@ from pyspark.sql.functions import col, sum, when, approx_count_distinct, min, ma
 from typing import Dict, List, Optional
 
 
+from pyspark.sql.functions import col, sum, when, lit, coalesce
+
+
 def profile_null_rates(df, cols: list):
+    """
+    Calculate null percentage for selected columns.
+    """
     total_rows = df.count()
-    exprs = [
-        (sum(when(col(c).isNull(), 1).otherwise(0)) / total_rows).alias(f"{c}_null_pct")
-        for c in cols if c in df.columns
-    ]
+
+    if total_rows == 0 or not cols:
+        return None
+
+    total_rows_lit = lit(total_rows)
+
+    exprs = []
+    for c in cols:
+        if c not in df.columns:
+            continue
+
+        expr = (
+            coalesce(
+                sum(when(col(c).isNull(), 1).otherwise(0)),
+                lit(0)
+            ) / total_rows_lit
+        ).alias(f"{c}_null_pct")
+
+        exprs.append(expr)
+
+    if not exprs:
+        return None
+
     return df.agg(*exprs)
+
+
 
 def profile_duplicate_ratio(df, key_cols: list):
     total_rows = df.count()
 
+    if total_rows == 0 or not key_cols:
+        return {
+            "keys": key_cols,
+            "duplicate_key_groups": 0,
+            "duplicate_rows": 0,
+            "duplicate_row_pct": 0,
+            "total_rows": total_rows
+        }
+
     dup_df = df.groupBy(*key_cols).count().filter("count > 1")
 
     duplicate_groups = dup_df.count()
-    duplicate_rows = dup_df.selectExpr("sum(count) - count(*) as dup_rows").collect()[0]["dup_rows"]
-    duplicate_row_pct = duplicate_rows / total_rows if total_rows else 0
+
+    duplicate_rows_expr = dup_df.selectExpr("sum(count) - count(*) as dup_rows").first()
+    duplicate_rows = duplicate_rows_expr["dup_rows"] if duplicate_rows_expr and duplicate_rows_expr["dup_rows"] else 0
+
+    duplicate_row_pct = round(duplicate_rows / total_rows, 4) if total_rows else 0
 
     return {
-    "keys": key_cols,
-    "duplicate_key_groups": duplicate_groups,
-    "duplicate_rows": duplicate_rows,
-    "duplicate_row_pct": round(duplicate_row_pct, 4),
-    "total_rows": total_rows
-}
+        "keys": key_cols,
+        "duplicate_key_groups": duplicate_groups,
+        "duplicate_rows": duplicate_rows,
+        "duplicate_row_pct": duplicate_row_pct,
+        "total_rows": total_rows
+    }
+
 
 
 def profile_cardinality(df, cols: list):
@@ -40,7 +80,8 @@ def profile_cardinality(df, cols: list):
             exprs.append(
                 approx_count_distinct(c).alias(f"{c}_distinct_count")
             )
-
+    if not exprs:
+       return {}
     card_df = df.agg(*exprs).first().asDict()
 
     metrics = {}
@@ -62,7 +103,8 @@ def profile_numeric_distribution(df, numeric_cols: list):
                 avg(c).alias(f"{c}_avg"),
                 stddev(c).alias(f"{c}_stddev")
             ])
-
+    if not exprs:
+        return None
     return df.agg(*exprs)
 
 
@@ -75,7 +117,9 @@ def profile_timestamp_range(df, ts_cols: list):
             exprs.append(max(c).alias(f"{c}_max"))
 
     ts_df = df.agg(*exprs).first().asDict()
-
+    
+    if not exprs:
+        return {}
     return ts_df
 
 def run_all_profiling_checks(df: DataFrame, config: Dict) -> Dict[str, object]:

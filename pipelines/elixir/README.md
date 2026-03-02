@@ -70,6 +70,8 @@ Each endpoint writes to its own Bronze table:
 | ------------------ | ------------------------------------------- |
 | incidents          | `elixir.brz.topdesk_incidents_raw`          |
 | time_registrations | `elixir.brz.topdesk_time_registrations_raw` |
+| impacts            | `elixir.brz.topdesk_impacts_raw`            |
+| branches           | `elixir.brz.topdesk_branches_raw`           |
 
 Schema:
 
@@ -81,12 +83,72 @@ ingestion_time TIMESTAMP
 Bronze is **append-only** and may contain duplicates.
 
 ---
+# 🧠 Incremental & Static Load Strategy
 
-# 🧠 Incremental Logic
+## 🔄 Incremental Logic
 
 * First run → full load
-* Next runs → `field > last_run` filter
+* Next runs → `<field> > last_run` filter
 * Each endpoint tracked independently
+
+---
+
+## 📦 Static / Reference Data
+
+Some endpoints represent **reference data** that:
+
+* do not contain `modificationDate` or `creationDate`
+* change infrequently
+* may vary in size depending on configuration (from small lookup tables to larger lists such as categories or operators)
+
+Examples:
+
+* IncidentPriorities
+* IncidentProcessingStatuses
+* Categories / Subcategories
+* ClosureCodes
+* Branches
+* BudgetHolders
+* OperatorGroups
+* ChangeImpacts / ChangePriorities / ChangeProcessingStatuses
+
+---
+
+## 🚫 How static endpoints are handled
+
+* Static endpoints are **not executed on every run**
+* They are typically **commented out or disabled in the pipeline**
+* They are only executed **manually when needed**
+
+---
+
+## 🔁 When to refresh static data
+
+Refresh these endpoints when:
+
+* configuration changes in TOPdesk
+* new categories, priorities, or statuses are created
+* organisational structure changes (operators, branches, groups)
+
+Typical refresh frequency:
+
+| Data                       | Suggested refresh |
+| -------------------------- | ----------------- |
+| Categories / Subcategories | monthly           |
+| Priorities / Statuses      | rarely            |
+| Operators                  | weekly or daily   |
+
+---
+
+## 📊 Summary
+
+| Data type     | Examples                               | Load strategy                    |
+| ------------- | -------------------------------------- | -------------------------------- |
+| Transactional | Incidents, TimeRegistrations, Changes  | Incremental (every run)          |
+| Reference     | Priorities, Statuses, Categories, etc. | Load once + refresh occasionally |
+
+
+
 
 State table:
 

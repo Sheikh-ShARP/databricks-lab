@@ -31,18 +31,35 @@ VALID_STATUSES = [
     "Reopened",
     "Response received"
 ]
+# ------------------------------------------------------------------
+# Define a list of columns that must never be null.
+NOT_NULL_COLUMNS = ["ticket_id", "status", "ticket_status", "created_date", "category"]
 
-RULES = [
-    # ------------------------------------------------------------------
-    # id - stable primary key, must always be present and unique
-    # ------------------------------------------------------------------
+# Auto-generate not_null rules for all columns
+NOT_NULL_RULES = [
     {
-        "rule_id":     "incidents_id_not_null",
-        "column":      "ticket_id",
-        "rule_type":   "not_null",
-        "severity":    "error",
-        "description": "Primary key 'id' must never be null.",
-    },
+    "rule_id":     f"incidents_{col}_not_null",
+    "column":      col,
+    "rule_type":   "not_null",
+    "severity":    "error",
+    "description": f"Column '{col}' must never be null.",
+    } 
+    for col in NOT_NULL_COLUMNS
+]
+
+RULES = NOT_NULL_RULES + [
+   
+    # {
+    #     "rule_id":     "incidents_id_not_null",
+    #     "column":      "ticket_id",
+    #     "rule_type":   "not_null",
+    #     "severity":    "error",
+    #     "description": "Primary key 'id' must never be null.",
+    # },
+    
+    # ------------------------------------------------------------------
+    # id - primary key, must be unique within each pipeline run
+    #
     {
         "rule_id":     "incidents_id_unique",
         "column":      "ticket_id",
@@ -51,19 +68,9 @@ RULES = [
         "description": "Primary key 'id' must be unique within each pipeline run.",
     },
 
-    # ------------------------------------------------------------------
-    # status - mutable processing state, must be present and recognised
-    # ------------------------------------------------------------------
-    {
-        "rule_id":     "incidents_status_not_null",
-        "column":      "ticket_status",
-        "rule_type":   "not_null",
-        "severity":    "error",
-        "description": "Every incident must have a processing status.",
-    },
     {
         "rule_id":     "incidents_status_accepted_values",
-        "column":      "ticket_status",
+        "column":      "status",
         "rule_type":   "accepted_values",
         "severity":    "warning",       # warning: new statuses can appear from TopDesk
         "params": {
@@ -71,17 +78,6 @@ RULES = [
             "case_sensitive": False
         },
         "description": "Status must be one of the known TopDesk processing statuses (case-insensitive).",
-    },
-
-    # ------------------------------------------------------------------
-    # created_date - origin timestamp, must always exist
-    # ------------------------------------------------------------------
-    {
-        "rule_id":     "incidents_created_date_not_null",
-        "column":      "created_date",
-        "rule_type":   "not_null",
-        "severity":    "error",
-        "description": "Every incident must have a creation date.",
     },
 
     # ------------------------------------------------------------------

@@ -33,6 +33,25 @@ def run_dq(
         silver_df = spark.table(source_table)
         print(f"  ✓ Loaded table: {source_table}\n")
 
+    # Guard: if the input DataFrame is empty, return early
+    row_count = silver_df.count()
+    if row_count == 0:
+        print("  ⚠  Input DataFrame is empty — nothing to validate.\n")
+        result = {
+            "run_id":           None,
+            "pipeline_name":    pipeline_name,
+            "source_table":     source_table,
+            "total_rules":      len(rules),
+            "error_failures":   0,
+            "warning_failures": 0,
+            "has_errors":       False,
+            "has_warnings":     False,
+            "passed":           True,
+        }
+        _print_final_verdict(result)
+        return result
+
+    print(f"  ✓ Row count: {row_count}\n")
     print("  Running rule evaluation...\n")
     
     # Add unique row key for tracking
@@ -109,5 +128,6 @@ def _print_final_verdict(result: dict) -> None:
     if result["has_warnings"]:
         print(f"  ⚠  {result['warning_failures']} rule(s) with warnings — check the report.")
 
-    print(f"\n  run_id : {result['run_id']}")
+    if result["run_id"]:
+        print(f"\n  run_id : {result['run_id']}")
     print(f"{'='*60}\n")
